@@ -17,10 +17,10 @@ MediaWindow::MediaWindow(QWidget *parent) : QWidget(parent)
     stopButton = new QPushButton("stop");
     chooseButton = new QPushButton("choose");
     playSlider = new QSlider(this);
-    playSlider->setRange(0,1000);
+    playSlider->setRange(0,10000);
     playSlider->setValue(0);
     playSlider ->setOrientation(Qt::Horizontal);
-    playSlider->setTickPosition(QSlider::TicksAbove);
+//    playSlider->setTickPosition(QSlider::T);
     imgLabel = new QLabel(this);
     imgLabel->resize(601,381);
     imgLabel->move(30,20);
@@ -125,9 +125,9 @@ void MediaWindow::doSeek()
 
 void MediaWindow::updateSlider(long totalTime, long currentTime)
 {
-    qDebug()<< "Total time:" << totalTime;
-    qDebug()<< "current time:" << currentTime;
-    double rate = currentTime *100 / (totalTime/1000);//当前播放的时间与视频总时间的比值*10000
+//    qDebug()<< "Total time:" << totalTime;
+//    qDebug()<< "current time:" << currentTime;
+    double rate = currentTime*10000/totalTime;
     qDebug()<< "rate:" << rate ;
     if (!playSlider->isSliderDown())
     {
