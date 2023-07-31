@@ -25,20 +25,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
         main.cpp \
-        mainwindow.cpp \
     demuxworker.cpp \
-    mediawindow.cpp \
-    testwindow.cpp
+    mediawindow.cpp
 
 HEADERS += \
-        mainwindow.h \
     demuxworker.h \
-    mediawindow.h \
-    testwindow.h
+    mediawindow.h
 
 FORMS += \
-        mainwindow.ui \
-    testwindow.ui
+    mediawindow.ui
 
 INCLUDEPATH += D:\soft\qt\project\videoPlayer\lib\win\ffmpeg\include
 INCLUDEPATH += D:\soft\qt\project\videoPlayer\lib\win\SDL2\include

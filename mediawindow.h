@@ -2,11 +2,9 @@
 #define MEDIAWINDOW_H
 
 #include <QWidget>
-#include <QLabel>
-#include <QDebug>
-#include <QPushButton>
 #include <QString>
 #include <QSlider>
+#include <QPushButton>
 #include "demuxworker.h"
 extern "C"
 {
@@ -21,13 +19,17 @@ extern "C"
 #include <SDL_rect.h>
 }
 
+namespace Ui {
+class MediaWindow;
+}
+
 class MediaWindow : public QWidget
 {
     Q_OBJECT
-public:
-    explicit MediaWindow(QWidget *parent = nullptr);
-    ~MediaWindow() ;
 
+public:
+    explicit MediaWindow(QWidget *parent = 0);
+    ~MediaWindow();
     QString gVideoFilePath;
     QString selectedFile;
     QLabel *imgLabel;
@@ -38,7 +40,9 @@ public:
     QPushButton *stopButton;
     QPushButton *chooseButton;
     long pos;
+
 private:
+    Ui::MediaWindow *ui;
     QThread *demuxThread;
     DemuxWorker *demuxWorker;
     SDL_Renderer *sdlRenderer;
@@ -58,7 +62,6 @@ public slots:
     int initSdl(int mWidth,int mHeight);
     void updateSlider(long TotalTime, long currentTime);
     void doSeek();
-
 };
 
 #endif // MEDIAWINDOW_H

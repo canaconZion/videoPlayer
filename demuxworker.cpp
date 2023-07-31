@@ -115,20 +115,6 @@ void DemuxWorker::slotDoWork(QString palyFile)
         {
             mSleep(1000);
         }
-        else if(doSeek)
-        {
-//            double video_clock = av_q2d(mAudioStream->time_base) * pkt->pts;
-            int64_t stamp = 0;
-            stamp = seekPos * avFormatContext->streams[videoStream]->duration;//当前它实际的位置
-            int ret = av_seek_frame(avFormatContext, videoStream, stamp,
-                                    AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_FRAME);//将视频移至到当前点击滑动条位置
-
-            emit sigGetCurrentPts(avFormatContext->duration/1000000 * av_q2d(pVideoCodecContext->time_base),
-                                  stamp * av_q2d(pVideoCodecContext->time_base));
-            qDebug() << seekPos;
-            doSeek = false;
-            mSleep(50);
-        }
         else
         {
             if(av_read_frame(avFormatContext, packet) < 0){
@@ -144,14 +130,41 @@ void DemuxWorker::slotDoWork(QString palyFile)
                 }
                 //解码
                 while(avcodec_receive_frame(pVideoCodecContext, pFrame) == 0){
-                    qDebug() << "druation " << avFormatContext->duration/1000000;
-//                    qDebug() << "frema pts" << pFrame->pts;
+                    //                    qDebug() << "druation " << avFormatContext->duration/1000000;
+                    //                    qDebug() << "frema pts" << pFrame->pts;
                     double video_clock = av_q2d(avFormatContext->streams[videoStream]->time_base) * packet ->dts;
                     qDebug() << "video clock" << video_clock;
-                    emit sigGetFrame(pFrame);
-                    emit sigGetCurrentPts(avFormatContext->duration/1000000,
-                                          video_clock);
-                    mSleep(50);
+                    if(doSeek)
+                    {
+                        if (video_clock < (avFormatContext->duration/1000000)*seekPos/10000)
+                            //            if(av_q2d(avFormatContext->streams[videoStream]->time_base) * packet ->dts < )
+                        {
+//                            av_packet_unref(packet);
+                            qDebug() << "Curr dts" << video_clock;
+//                            qDebug() << "target dts" << (avFormatContext->duration/1000000)*seekPos/10000;
+                            int64_t targetPTS = int64_t(((avFormatContext->duration/1000000)*seekPos/10000)/av_q2d(avFormatContext->streams[videoStream]->time_base));
+                            qDebug() << "targetPTS" << targetPTS;
+
+                            int64_t targetTimestamp = av_rescale_q(int64_t(video_clock), {1, AV_TIME_BASE}, avFormatContext->streams[videoStream]->time_base);
+
+                                // 执行跳转
+                            qDebug() << "targetTimestamp" << targetTimestamp;
+                            av_seek_frame(avFormatContext, videoStream, targetTimestamp, AVSEEK_FLAG_BACKWARD);
+                            continue;
+                        }
+                        else
+                        {
+                            qDebug() << "in target dts" << (avFormatContext->duration/1000000)*seekPos/10000;
+                            doSeek = false;
+                        }
+                    }
+                    else
+                    {
+                        emit sigGetFrame(pFrame);
+                        emit sigGetCurrentPts(avFormatContext->duration/1000000,
+                                              video_clock);
+                        mSleep(50);
+                    }
                 }
             }
             else
@@ -164,6 +177,7 @@ void DemuxWorker::slotDoWork(QString palyFile)
                 goto end;
             }
         }
+
     }
 
 end:

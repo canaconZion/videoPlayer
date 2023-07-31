@@ -1,4 +1,5 @@
 #include "mediawindow.h"
+#include "ui_mediawindow.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -7,21 +8,24 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QFileDialog>
+#include <QDebug>
 
-MediaWindow::MediaWindow(QWidget *parent) : QWidget(parent)
+MediaWindow::MediaWindow(QWidget *parent) :
+    QWidget(parent),
+    ui(new Ui::MediaWindow)
 {
+    ui->setupUi(this);
 
-    this->setFixedSize(661,465);
-    startButton = new QPushButton("start");
-    pauseButton = new QPushButton("pause");
-    stopButton = new QPushButton("stop");
-    chooseButton = new QPushButton("choose");
-    playSlider = new QSlider(this);
+    startButton = ui->play;
+    pauseButton = ui->pause;
+    stopButton = ui->quit;
+    chooseButton = ui->select;
+    playSlider = ui->slider;
     playSlider->setRange(0,10000);
     playSlider->setValue(0);
     playSlider ->setOrientation(Qt::Horizontal);
 //    playSlider->setTickPosition(QSlider::T);
-    imgLabel = new QLabel(this);
+    imgLabel = ui->screen;
     imgLabel->resize(601,381);
     imgLabel->move(30,20);
     rect = imgLabel->geometry();//记录widget位置，恢复时使用
@@ -59,9 +63,9 @@ MediaWindow::MediaWindow(QWidget *parent) : QWidget(parent)
     connect(playSlider, SIGNAL(sliderReleased()), this, SLOT(doSeek()));
 
 }
-
 MediaWindow::~MediaWindow()
 {
+    delete ui;
     freeSdl();
 }
 void MediaWindow::startPlay(){
@@ -117,7 +121,8 @@ void MediaWindow::selectFile(){
 void MediaWindow::doSeek()
 {
     qDebug()<< "DO SEEK" ;
-    pos = (float)playSlider->value() / (float)(playSlider->maximum() + 1);
+    pos = playSlider->value();
+    qDebug() << "POS" << pos;
     demuxWorker->seekPos = pos;
     demuxWorker->doSeek = true;
 }
@@ -125,10 +130,10 @@ void MediaWindow::doSeek()
 
 void MediaWindow::updateSlider(long totalTime, long currentTime)
 {
-//    qDebug()<< "Total time:" << totalTime;
-//    qDebug()<< "current time:" << currentTime;
+    //    qDebug()<< "Total time:" << totalTime;
+    //    qDebug()<< "current time:" << currentTime;
     double rate = currentTime*10000/totalTime;
-    qDebug()<< "rate:" << rate ;
+//    qDebug()<< "rate:" << rate ;
     if (!playSlider->isSliderDown())
     {
         playSlider->setValue(rate);
