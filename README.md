@@ -1,2 +1,0 @@
-# videoPlayer
-ffmpeg+Qt+SDL
