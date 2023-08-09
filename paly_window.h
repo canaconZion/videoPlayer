@@ -35,6 +35,9 @@ public:
     QPushButton *select;
     QPushButton *quit;
     QSlider *video_slider;
+    QLabel *curr_time;
+    QLabel *total_time;
+    QString totalTime;
 
 
 private:
