@@ -10,58 +10,84 @@
     <height>520</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QWidget{background-color:rgb(105,105,105);}</string>
+   <string notr="true">QWidget{background-color:rgb(242,230,206);}</string>
   </property>
-  <widget class="QWidget" name="verticalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>10</y>
-     <width>831</width>
-     <height>501</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <item>
-     <widget class="QLabel" name="playback">
-      <property name="styleSheet">
-       <string notr="true">QLabel{background-color:rgb(100,149,237);}</string>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_2">
-      <item>
-       <widget class="QPushButton" name="pause">
-        <property name="styleSheet">
-         <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
-        </property>
-        <property name="text">
-         <string>暂停</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="play">
-        <property name="styleSheet">
-         <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
-        </property>
-        <property name="text">
-         <string>播放</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QSlider" name="videoSlider">
-        <property name="styleSheet">
-         <string notr="true">QSlider::groove:horizontal {
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QLabel" name="playback">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QLabel{background-color:rgb(81,196,211);}</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QPushButton" name="pause">
+         <property name="styleSheet">
+          <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
+         </property>
+         <property name="text">
+          <string>暂停</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="play">
+         <property name="styleSheet">
+          <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
+         </property>
+         <property name="text">
+          <string>播放</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="total_time">
+         <property name="text">
+          <string>00:00:00</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>/</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="curr_time">
+         <property name="text">
+          <string>00:00:00</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSlider" name="videoSlider">
+         <property name="styleSheet">
+          <string notr="true">QSlider::groove:horizontal {
   border: 0px solid #bbb;
 }
  
@@ -111,43 +137,80 @@ QSlider::handle:horizontal:disabled {
   border: 1px solid #aaa; 
   border-radius: 4px; 
 }</string>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </item>
-    <item>
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <widget class="QPushButton" name="select">
-        <property name="styleSheet">
-         <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
-        </property>
-        <property name="text">
-         <string>选择文件</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="quit">
-        <property name="styleSheet">
-         <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
-        </property>
-        <property name="text">
-         <string>退出</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </item>
-   </layout>
-   <zorder>horizontalLayoutWidget</zorder>
-   <zorder>horizontalLayoutWidget_2</zorder>
-   <zorder>playback</zorder>
-  </widget>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="select">
+         <property name="styleSheet">
+          <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
+         </property>
+         <property name="text">
+          <string>选择文件</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="quit">
+         <property name="styleSheet">
+          <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
+         </property>
+         <property name="text">
+          <string>退出</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>

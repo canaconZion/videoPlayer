@@ -35,6 +35,9 @@ public:
     QPushButton *select;
     QPushButton *quit;
     QSlider *video_slider;
+    QLabel *curr_time;
+    QLabel *total_time;
+    QString totalTime;
 
 
 private:
@@ -54,7 +57,6 @@ public slots:
     void pausePlay();
     void quitPlay();
     void selectFile();
-    void updateVideo();
     void updateVideo(AVFrame *pFrame);
     int initSdl(int mWidth,int mHeight);
     void updateSlider(long TotalTime, long currentTime);
