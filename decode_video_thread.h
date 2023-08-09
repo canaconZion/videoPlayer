@@ -14,7 +14,6 @@ class DecodeThread:public QObject
 public:
     DecodeThread(QObject *parent = nullptr);
     ~DecodeThread();
-private:
     bool isPlay;
     bool isPause;
     QString source_file;
