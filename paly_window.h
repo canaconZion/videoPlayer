@@ -54,7 +54,6 @@ public slots:
     void pausePlay();
     void quitPlay();
     void selectFile();
-    void updateVideo();
     void updateVideo(AVFrame *pFrame);
     int initSdl(int mWidth,int mHeight);
     void updateSlider(long TotalTime, long currentTime);

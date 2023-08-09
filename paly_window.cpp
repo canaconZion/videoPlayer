@@ -26,10 +26,10 @@ paly_window::paly_window(QWidget *parent) :
     do_decode -> moveToThread(decode_thread);
 
     connect(decode_thread,&QThread::finished,do_decode,&QObject::deleteLater);
-    connect(decode_thread,SIGNAL(sigGetCurrentPts(long, long)),this,SLOT(updateSlider(long, long)));
-    connect(decode_thread,SIGNAL(sigGetVideoInfo(int,int)),this,SLOT(initSdl(int ,int)));
-    connect(decode_thread,SIGNAL(sigGetFrame(AVFrame *)),this,SLOT(updateVideo(AVFrame *)));
-    connect(this,SIGNAL(sigStartPlay(QString)),decode_thread,SLOT(slotDoWork(QString)));
+    connect(do_decode,SIGNAL(sigGetCurrentPts(long, long)),this,SLOT(updateSlider(long, long)));
+    connect(do_decode,SIGNAL(sigGetVideoInfo(int,int)),this,SLOT(initSdl(int ,int)));
+    connect(do_decode,SIGNAL(sigGetFrame(AVFrame *)),this,SLOT(updateVideo(AVFrame *)));
+    connect(this,SIGNAL(sigStartPlay(QString)),do_decode,SLOT(slotDoWork(QString)));
 
 }
 
@@ -69,15 +69,17 @@ void paly_window::quitPlay()
 {
 
 }
-void paly_window::updateVideo()
+void paly_window::updateVideo(AVFrame *pFrame)
 {
 
 }
-void paly_window::updateVideo()
+
+void paly_window::updateSlider(long TotalTime, long currentTime)
 {
 
 }
-int DecodeThread::initSdl(int mWidth,int mHeight) {
+
+int paly_window::initSdl(int mWidth,int mHeight) {
 
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
@@ -97,7 +99,7 @@ int DecodeThread::initSdl(int mWidth,int mHeight) {
     sdlTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
 }
 
-int MediaWindow::freeSdl() {
+int paly_window::freeSdl() {
     SDL_DestroyRenderer(sdlRenderer);
     SDL_DestroyTexture(sdlTexture);
     SDL_DestroyWindow(sdlWindow);
