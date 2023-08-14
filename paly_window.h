@@ -8,6 +8,7 @@
 #include <QString>
 #include <QThread>
 #include "decode_video_thread.h"
+#include <QInputDialog>
 extern "C"
 {
 #include "SDL.h"
@@ -34,10 +35,12 @@ public:
     QPushButton *pause;
     QPushButton *select;
     QPushButton *quit;
+    QPushButton *net_butt;
     QSlider *video_slider;
     QLabel *curr_time;
     QLabel *total_time;
     QString totalTime;
+    QString c_timeStr;
 
 
 private:
@@ -57,6 +60,7 @@ public slots:
     void pausePlay();
     void quitPlay();
     void selectFile();
+    void inputNetUrl();
     void updateVideo(AVFrame *pFrame);
     int initSdl(int mWidth,int mHeight);
     void updateSlider(long TotalTime, long currentTime);
