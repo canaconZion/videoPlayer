@@ -9,6 +9,8 @@ extern "C"
 #include "libavcodec/avcodec.h"
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
+#include <libavutil/time.h>
+
 }
 
 class DecodeThread:public QObject
@@ -19,6 +21,7 @@ public:
     ~DecodeThread();
     bool isPlay;
     bool isPause;
+    bool isFileChange;
     long total_time;
     long curr_time;
     QString source_file;
@@ -33,6 +36,7 @@ protected:
 private:
     bool  mIsMute;
     float mVolume; //音量 0~1 超过1 表示放大倍数
+    double frameRate;
 
     /// 跳转相关的变量
     int             seek_req = 0; //跳转标志
@@ -68,9 +72,6 @@ private:
     AVCodec *aCodec;
     AVFrame *aFrame;
 
-    ///以下变量用于音频重采样
-    /// 由于ffmpeg解码出来后的pcm数据有可能是带平面的pcm，因此这里统一做重采样处理，
-    /// 重采样成44100的16 bits 双声道数据(AV_SAMPLE_FMT_S16)
     AVFrame *aFrame_ReSample;
     SwrContext *swrCtx;
 

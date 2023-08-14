@@ -14,6 +14,7 @@ paly_window::paly_window(QWidget *parent) :
     play = ui->play;
     pause = ui->pause;
     select = ui->select;
+    net_butt = ui->netStream;
     quit = ui->quit;
     imgLabel = ui->playback;
     curr_time = ui->curr_time;
@@ -23,6 +24,7 @@ paly_window::paly_window(QWidget *parent) :
     video_slider->setRange(0,10000);
 
     connect(select,&QPushButton::clicked,this,&paly_window::selectFile);
+    connect(net_butt,&QPushButton::clicked,this,&paly_window::inputNetUrl);
     connect(play,&QPushButton::clicked,this,&paly_window::startPlay);
     connect(pause,&QPushButton::clicked,this,&paly_window::pausePlay);
     connect(quit,&QPushButton::clicked,this,&paly_window::quitPlay);
@@ -48,7 +50,8 @@ paly_window::~paly_window()
 void paly_window::selectFile()
 {
     //    play->setEnabled(true);
-    //    do_decode->isPause = false;
+    do_decode->isPause = true;
+    pause->setText("继续");
     source_path = "D:/video/videos";
     QString s = QFileDialog::getOpenFileName(
                 this, QStringLiteral("选择要播放的文件"),
@@ -58,16 +61,42 @@ void paly_window::selectFile()
                 +QStringLiteral("所有文件 (*.*)"));
     if (!s.isEmpty())
     {
+        do_decode->isPlay = false;
         source_file = s;
         qDebug() << source_file;
+        startPlay();
     }
-    select->setEnabled(false);
-    startPlay();
+    else
+    {
+        pausePlay();
+    }
+    //    select->setEnabled(false);
+
+
+}
+
+void paly_window::inputNetUrl()
+{
+    do_decode->isPause = true;
+    pause->setText("继续");
+    bool ok;
+    QString text = QInputDialog::getText(nullptr, "打开媒体", "请输入网络URL:", QLineEdit::Normal, QString(), &ok);
+
+    if (ok && !text.isEmpty()) {
+        qDebug() << "User input: " << text;
+        do_decode->isPlay = false;
+        source_file = text;
+        startPlay();
+    } else {
+        qDebug() << "User cancelled the input.";
+        pausePlay();
+    }
 
 }
 
 void paly_window::startPlay()
 {
+    pausePlay();
     decode_thread->start();
     qDebug() << "文件：" << source_file;
     emit sigStartPlay(source_file);
@@ -115,8 +144,15 @@ void paly_window::updateSlider(long TotalTime, long currentTime)
     QString sStr = QString("0%1").arg(TotalTime % 60);
     totalTime = QString("%1:%2:%3").arg(hStr).arg(mStr.right(2)).arg(sStr.right(2));
     total_time->setText(totalTime);
-    double rate = currentTime*10000/TotalTime;
-    qDebug() << "Total time" << TotalTime;
+    QString c_hStr = QString("0%1").arg((currentTime)/3600);
+    QString c_mStr = QString("0%1").arg((currentTime)/ 60 % 60);
+    QString c_sStr = QString("0%1").arg((currentTime)% 60);
+    QString c_timeStr = QString("%1:%2:%3").arg(c_hStr).arg(c_mStr.right(2)).arg(c_sStr.right(2));
+    curr_time->setText(c_timeStr);
+    double rate = (currentTime+1)*10000/TotalTime;
+    //    qDebug() << "Total time" << TotalTime;
+    //    qDebug() << "Current time" << currentTime;
+    //    qDebug() << "=====================================";
     if (!video_slider->isSliderDown())
     {
         video_slider->setValue(rate);

@@ -1,6 +1,9 @@
 #include "decode_video_thread.h"
+#include "paly_window.h"
+#include "ui_paly_window.h"
 #include <QDebug>
 #include <QTime>
+#include <iostream>
 
 DecodeThread::DecodeThread(QObject *parent):QObject (parent)
 {
@@ -203,16 +206,21 @@ void DecodeThread::slotDoWork(QString palyFile)
     int audioStream= -1;
     int videoStream = -1;
     int err = -1;
-    const char* filePath = palyFile.toUtf8().data();
+    QByteArray byteArray = palyFile.toUtf8();
+    char* filePath = byteArray.data();
+    qDebug() << "Begin to decode video: " << palyFile ;
     isPlay = true;
     isPause = false;
     avFormatContext = avformat_alloc_context();
     if (!avFormatContext) {
         av_log(nullptr, AV_LOG_FATAL, "Could not allocate context.\n");
     }
-
+    qDebug() << filePath;
     if(avformat_open_input(&avFormatContext, filePath, nullptr, nullptr) != 0){
-        qDebug() << "Couldn't open file";
+        qDebug() << "Couldn't open file" << filePath;
+//        std::cout << filePath << std::endl;
+        avformat_close_input(&avFormatContext);
+        return;
     }
     // Retrieve stream information
     if(avformat_find_stream_info(avFormatContext, nullptr)<0){
@@ -243,6 +251,7 @@ void DecodeThread::slotDoWork(QString palyFile)
 
     if(videoStream != -1)
     {
+        frameRate = av_q2d(avFormatContext->streams[videoStream]->r_frame_rate);
         //视频
         pVideoChannelCodecPara = avFormatContext->streams[videoStream]->codecpar;
         pVideoCodecContext =  avcodec_alloc_context3(nullptr);
@@ -274,11 +283,15 @@ void DecodeThread::slotDoWork(QString palyFile)
         emit sigGetVideoInfo(pVideoCodecContext->width, pVideoCodecContext->height);
         qDebug() << "视频宽度:" << pVideoCodecContext->width << "高度:" << pVideoCodecContext->height;
     }
+    qDebug() << frameRate << "freamRate " << frameRate;
     for (;;) {
         if (isPause)
         {
-            mSleep(1000);
+            mSleep(500);
         }
+//        if (isFileChange){
+//            goto end;
+//        }
         else
         {
             if(av_read_frame(avFormatContext, packet) < 0){
@@ -298,7 +311,18 @@ void DecodeThread::slotDoWork(QString palyFile)
                     emit sigGetFrame(pFrame);
                     emit sigGetCurrentPts(total_time,
                                           video_clock);
-                    mSleep(50);
+                    //                    int64_t framePts = av_frame_get_best_effort_timestamp(pFrame);
+                    //                    // int64_t timeUs = av_rescale_q(framePts, avFormatContext->streams[videoStream]->time_base, AV_TIME_BASE_Q);
+                    //                    int64_t currentTimeUs = av_gettime_relative();
+                    //                    double waitTimeUs = video_clock - currentTimeUs/1000000.0;
+                    //                    qDebug() << "waitTimeUs" << waitTimeUs;
+                    //                    qDebug() << frameRate << "freamRate " << frameRate;
+                    //                    if (waitTimeUs > 0)
+                    //                    {
+                    //                        qDebug() << "waitTimeUs" << waitTimeUs;
+                    //                        av_usleep(waitTimeUs);
+                    //                    }
+                    mSleep((1000/frameRate)-5);
                 }
             }
             else
@@ -317,4 +341,8 @@ end:
     avcodec_close(pVideoCodecContext);
     avformat_close_input(&avFormatContext);
     qDebug() << "end of play";
+//    if(isFileChange){
+//        slotDoWork(source_file);
+//        isFileChange = false;
+//    }
 }
