@@ -24,6 +24,8 @@ public:
     bool isFileChange;
     long total_time;
     long curr_time;
+    double frameRate;
+    QString decoder;
     QString source_file;
     bool startPlay(QString filePath);
 
@@ -36,7 +38,6 @@ protected:
 private:
     bool  mIsMute;
     float mVolume; //音量 0~1 超过1 表示放大倍数
-    double frameRate;
 
     /// 跳转相关的变量
     int             seek_req = 0; //跳转标志

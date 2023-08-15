@@ -273,6 +273,7 @@ void DecodeThread::slotDoWork(QString palyFile)
         }
 
         qDebug() << "编解码器名:" << pCodecVideo->long_name;
+        decoder = QString(pCodecVideo->long_name);
 
         err = avcodec_open2(pVideoCodecContext, pCodecVideo, nullptr);
         if(err){

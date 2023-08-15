@@ -5,12 +5,19 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTimer>
+#include <QWidget>
+#include <QMenu>
+#include <QAction>
+#include <QContextMenuEvent>
 
 paly_window::paly_window(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::paly_window)
 {
     ui->setupUi(this);
+
+    createMenu();
+
     play = ui->play;
     pause = ui->pause;
     select = ui->select;
@@ -22,6 +29,9 @@ paly_window::paly_window(QWidget *parent) :
 
     video_slider = ui ->videoSlider;
     video_slider->setRange(0,10000);
+
+    // 在imgLabel注册完成后，初始化SDL
+    initSdl();
 
     connect(select,&QPushButton::clicked,this,&paly_window::selectFile);
     connect(net_butt,&QPushButton::clicked,this,&paly_window::inputNetUrl);
@@ -35,7 +45,7 @@ paly_window::paly_window(QWidget *parent) :
 
     connect(decode_thread,&QThread::finished,do_decode,&QObject::deleteLater);
     connect(do_decode,SIGNAL(sigGetCurrentPts(long, long)),this,SLOT(updateSlider(long, long)));
-    connect(do_decode,SIGNAL(sigGetVideoInfo(int,int)),this,SLOT(initSdl(int ,int)));
+    connect(do_decode,SIGNAL(sigGetVideoInfo(int,int)),this,SLOT(settingSdl(int ,int)));
     connect(do_decode,SIGNAL(sigGetFrame(AVFrame *)),this,SLOT(updateVideo(AVFrame *)));
     connect(this,SIGNAL(sigStartPlay(QString)),do_decode,SLOT(slotDoWork(QString)));
 
@@ -64,6 +74,8 @@ void paly_window::selectFile()
         do_decode->isPlay = false;
         source_file = s;
         qDebug() << source_file;
+        SDL_DestroyRenderer(sdlRenderer);
+        SDL_DestroyTexture(sdlTexture);
         startPlay();
     }
     else
@@ -86,6 +98,8 @@ void paly_window::inputNetUrl()
         qDebug() << "User input: " << text;
         do_decode->isPlay = false;
         source_file = text;
+        SDL_DestroyRenderer(sdlRenderer);
+        SDL_DestroyTexture(sdlTexture);
         startPlay();
     } else {
         qDebug() << "User cancelled the input.";
@@ -159,7 +173,7 @@ void paly_window::updateSlider(long TotalTime, long currentTime)
     }
 }
 
-int paly_window::initSdl(int mWidth,int mHeight) {
+int paly_window::initSdl() {
 
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
@@ -172,8 +186,16 @@ int paly_window::initSdl(int mWidth,int mHeight) {
 
         return -1;
     }
+    qDebug() << "++++++++++Init SDL+++++++++++++";
+}
+
+void paly_window::settingSdl(int mWidth, int mHeight)
+{
+    video_height = QString::number(mHeight);
+    video_width = QString::number(mWidth);
     sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
     sdlTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
+    qDebug() << "++++++++++Update SDL+++++++++++++";
 }
 
 int paly_window::freeSdl() {
@@ -182,4 +204,62 @@ int paly_window::freeSdl() {
     SDL_DestroyWindow(sdlWindow);
     SDL_Quit();
     return 0;
+}
+
+void paly_window::createMenu()
+{
+    QAction* m_ActionSelect = new QAction(tr("选择播放文件"), this);
+    QAction* m_ActionNet = new QAction(tr("播放网络流"), this);
+    QAction* m_ActionVideoMsg = new QAction(tr("查看媒体信息"), this);
+    //    QAction* m_ActionModel = new QAction(tr("Model selecte"), this);
+    QAction* m_ActionSetting = new QAction(tr("设置"), this);
+    QAction* m_ActionQuit = new QAction(tr("Exit"),this);
+
+    addAction(m_ActionSelect);
+    addAction(m_ActionNet);
+    addAction(m_ActionVideoMsg);
+    //    addAction(m_ActionModel);
+    addAction(m_ActionSetting);
+
+    QAction* separator = new QAction();
+    separator->setSeparator(true);
+    addAction(separator);
+
+    addAction(m_ActionQuit);
+
+    setContextMenuPolicy(Qt::ActionsContextMenu);
+
+    connect(m_ActionSelect, &QAction::triggered, this, &paly_window::selectFile);
+    connect(m_ActionNet, &QAction::triggered, this, &paly_window::inputNetUrl);
+    connect(m_ActionQuit, &QAction::triggered, this, &paly_window::quitPlay);
+    connect(m_ActionVideoMsg, &QAction::triggered, this, &paly_window::videoMsgWin);
+}
+
+void paly_window::getMousePos()
+{
+
+}
+
+void paly_window::videoMsgWin()
+{
+    QMessageBox *msgBox = new QMessageBox;
+    video_rate = QString::number(do_decode->frameRate);
+    video_decoder = do_decode->decoder;
+    qDebug() << "视频帧率 " << do_decode->frameRate;
+    QString message = QString("\n🎞媒体源: %5\n\n🎞视频编解码器: %1\n"
+                              "\n🎞视频分辨率: %2x%3\n\n🎞视频帧率: %4\n"
+                              "\n🎞视频时长: %6\n"
+                              "\n").arg(video_decoder,
+                                        video_width,
+                                        video_height,
+                                        video_rate,
+                                        source_file,
+                                        totalTime);
+    msgBox->setAttribute(Qt::WA_DeleteOnClose);
+    msgBox->setWindowTitle(tr("媒体信息"));
+//    msgBox->resize(300,400);
+    msgBox->setText(message);
+    msgBox->setDetailedText(tr("Get more messages📺📺📺📺📺📺..."));
+    msgBox->setStandardButtons(QMessageBox::Close);
+    msgBox->open();
 }

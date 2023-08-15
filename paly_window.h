@@ -41,6 +41,12 @@ public:
     QLabel *total_time;
     QString totalTime;
     QString c_timeStr;
+    QString video_decoder;
+    QString video_size;
+    QString video_rate;
+    QString video_height;
+    QString video_width;
+
 
 
 private:
@@ -50,7 +56,10 @@ private:
     SDL_Renderer *sdlRenderer;
     SDL_Texture *sdlTexture;
     SDL_Window *sdlWindow;
+    void createMenu();
     int freeSdl();
+    void videoMsgWin();
+    void getMousePos();
 
 signals:
     void sigStartPlay(QString file);
@@ -62,7 +71,8 @@ public slots:
     void selectFile();
     void inputNetUrl();
     void updateVideo(AVFrame *pFrame);
-    int initSdl(int mWidth,int mHeight);
+    int initSdl();
+    void settingSdl(int mWidth,int mHeight);
     void updateSlider(long TotalTime, long currentTime);
 };
 
