@@ -17,8 +17,9 @@ extern "C"
 #include "SDL_render.h"
 }
 
-namespace Ui {
-class paly_window;
+namespace Ui
+{
+    class paly_window;
 }
 
 class paly_window : public QWidget
@@ -47,8 +48,6 @@ public:
     QString video_height;
     QString video_width;
 
-
-
 private:
     Ui::paly_window *ui;
     QThread *decode_thread;
@@ -56,10 +55,12 @@ private:
     SDL_Renderer *sdlRenderer;
     SDL_Texture *sdlTexture;
     SDL_Window *sdlWindow;
+    long slider_pos;
     void createMenu();
     int freeSdl();
     void videoMsgWin();
     void getMousePos();
+    void updateTimeLabel(long TotalTime, long currentTime);
 
 signals:
     void sigStartPlay(QString file);
@@ -72,7 +73,9 @@ public slots:
     void inputNetUrl();
     void updateVideo(AVFrame *pFrame);
     int initSdl();
-    void settingSdl(int mWidth,int mHeight);
+    void doSeek();
+    void checkSdl();
+    void settingSdl(int mWidth, int mHeight);
     void updateSlider(long TotalTime, long currentTime);
 };
 
