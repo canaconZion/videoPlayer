@@ -1,7 +1,6 @@
 #include <QApplication>
 #include "paly_window.h"
 
-
 #undef main
 int main(int argc, char *argv[])
 {
@@ -11,4 +10,3 @@ int main(int argc, char *argv[])
     win.show();
     return a.exec();
 }
-
