@@ -202,10 +202,10 @@ void DecodeThread::decodeVideoThread()
 void DecodeThread::slotDoWork(QString palyFile)
 {
     AVFormatContext *avFormatContext = nullptr;
-    AVPacket *packet = (AVPacket *)malloc(sizeof(AVPacket));
+    packet = (AVPacket *)malloc(sizeof(AVPacket));
     AVFrame *pFrame = nullptr;
-    int audioStream = -1;
-    int videoStream = -1;
+    audioStream = -1;
+    videoStream = -1;
     int err = -1;
     QByteArray byteArray = palyFile.toUtf8();
     char *filePath = byteArray.data();
@@ -296,6 +296,21 @@ void DecodeThread::slotDoWork(QString palyFile)
         emit sigGetVideoInfo(pVideoCodecContext->width, pVideoCodecContext->height);
         qDebug() << "视频宽度:" << pVideoCodecContext->width << "高度:" << pVideoCodecContext->height;
     }
+    if (audioStream != -1)
+    {
+        wanted_spec.freq = out_sample_rate;
+        wanted_spec.format = AUDIO_S16SYS;
+        wanted_spec.channels = out_channels;
+        wanted_spec.silence = 0;
+        wanted_spec.samples = out_nb_samples;
+        wanted_spec.callback = fill_audio;
+        wanted_spec.userdata = aCodecCtx;
+
+        if (SDL_OpenAudio(&wanted_spec, NULL)<0){
+            printf("can't open audio.\n");
+            return -1;
+        }
+    }
     bitRate = avFormatContext->bit_rate/1000;
     qDebug() << frameRate << "freamRate " << frameRate;
     for (;;)
@@ -376,6 +391,15 @@ void DecodeThread::slotDoWork(QString palyFile)
                     //                    }
                     mSleep((1000 / frameRate) - 5);
                 }
+            }
+            else if(packet->stream_index == audioStream)
+            {
+                qDebug() << "OPen video decod";
+                std::thread([&](DecodeThread *pointer)
+                {
+                    pointer->decodeAudioThread();
+
+                }, this).detach();
             }
             else
             {
