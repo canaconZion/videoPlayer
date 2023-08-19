@@ -10,7 +10,25 @@ extern "C"
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
 #include <libavutil/time.h>
+#include "SDL.h"
+#include "SDL_video.h"
+#include "SDL_rect.h"
+#include "SDL_render.h"
 }
+
+#define MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
+
+//Output PCM
+#define OUTPUT_PCM 1
+//Use SDL
+#define USE_SDL 1
+
+//Buffer:
+//|-----------|-------------|
+//chunk-------pos---len-----|
+static  Uint8  *audio_chunk;
+static  Uint32  audio_len;
+static  Uint8  *audio_pos;
 
 class DecodeThread : public QObject
 {
@@ -34,6 +52,8 @@ public:
 protected:
     void readVideoFile();
     void decodeVideoThread();
+    int decodeAudioThread();
+    void fill_audio(void *udata,Uint8 *stream,int len);
 
     int decodeAudioFrame(bool isBlock = false);
 
@@ -65,18 +85,25 @@ private:
     AVStream *mVideoStream;   // 视频流
     AVStream *mAudioStream;   // 音频流
 
+    AVPacket *packet;
     /// 视频相关
+    int videoStream;
     AVFormatContext *pFormatCtx;
     AVCodecContext *pCodecCtx;
     AVCodec *pCodec;
 
     /// 音频相关
+    int audioStream;
+    int a_i;
+    SDL_AudioSpec wanted_spec;
+    FILE *pFile=NULL;
+    uint8_t			*out_buffer;
+
     AVCodecContext *aCodecCtx;
     AVCodec *aCodec;
     AVFrame *aFrame;
-
     AVFrame *aFrame_ReSample;
-    SwrContext *swrCtx;
+    SwrContext *au_convert_ctx;
 
 signals:
     void sigGetFrame(AVFrame *pFrame);

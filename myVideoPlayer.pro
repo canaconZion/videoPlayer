@@ -26,11 +26,14 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
     paly_window.cpp \
-    decode_video_thread.cpp
+    decode_video_thread.cpp \
+    audiodecode.cpp \
+    decode_audio_thread.cpp
 
 HEADERS += \
     paly_window.h \
-    decode_video_thread.h
+    decode_video_thread.h \
+    audiodecode.h
 
 FORMS += \
     paly_window.ui
