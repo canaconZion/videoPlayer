@@ -8,3 +8,10 @@
 - 视频进度label
 - 将SDL嵌入Qt窗口，播放视频
 - 视频解码线程
+
+
+# 界面
+![](./picture/playing.png)
+![](./picture/screen.png)
+![](./picture/setting.png)
+![](./picture/video_msg.png)
