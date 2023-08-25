@@ -5,6 +5,24 @@
 #include <QTime>
 #include <iostream>
 
+static Uint8 *audio_chunk;
+static Uint32 audio_len;
+static Uint8 *audio_pos;
+
+void fill_audio(void *udata, Uint8 *stream, int len)
+{
+    // SDL 2.0
+    SDL_memset(stream, 0, len);
+    if (audio_len == 0)
+        return;
+
+    len = (len > audio_len ? audio_len : len); /*  Mix  as  much  data  as  possible  */
+
+    SDL_MixAudio(stream, audio_pos, len, SDL_MIX_MAXVOLUME);
+    audio_pos += len;
+    audio_len -= len;
+}
+
 DecodeThread::DecodeThread(QObject *parent) : QObject(parent)
 {
 }
@@ -29,9 +47,9 @@ bool DecodeThread::startPlay(QString filePath)
 {
     source_file = filePath;
     std::thread([&](DecodeThread *pointer)
-                { pointer->readVideoFile(); },
-                this)
-        .detach();
+    { pointer->readVideoFile(); },
+    this)
+    .detach();
 }
 
 void DecodeThread::readVideoFile()
@@ -44,7 +62,7 @@ void DecodeThread::readVideoFile()
     aCodec = nullptr;
     aFrame = nullptr;
 
-    swrCtx = nullptr;
+    //    swrCtx = nullptr;
 
     mAudioStream = nullptr;
     mVideoStream = nullptr;
@@ -109,11 +127,11 @@ void DecodeThread::readVideoFile()
 
         /// 创建一个线程专门用来解码视频
         std::thread([&](DecodeThread *pointer)
-                    {
-                        pointer->decodeVideoThread();
-                    },
-                    this)
-            .detach();
+        {
+            pointer->decodeVideoThread();
+        },
+        this)
+        .detach();
     }
 
 end:
@@ -122,11 +140,11 @@ end:
         mSleep(10);
     } // 确保视频线程结束后 再销毁队列
 
-    if (swrCtx != nullptr)
-    {
-        swr_free(&swrCtx);
-        swrCtx = nullptr;
-    }
+    //    if (swrCtx != nullptr)
+    //    {
+    //        swr_free(&swrCtx);
+    //        swrCtx = nullptr;
+    //    }
 
     if (aFrame != nullptr)
     {
@@ -199,6 +217,7 @@ void DecodeThread::decodeVideoThread()
     }
 }
 
+// 此函数弃用，使用函数slotDecode进行解码
 void DecodeThread::slotDoWork(QString palyFile)
 {
     AVFormatContext *avFormatContext = nullptr;
@@ -296,21 +315,21 @@ void DecodeThread::slotDoWork(QString palyFile)
         emit sigGetVideoInfo(pVideoCodecContext->width, pVideoCodecContext->height);
         qDebug() << "视频宽度:" << pVideoCodecContext->width << "高度:" << pVideoCodecContext->height;
     }
-    if (audioStream != -1)
-    {
-        wanted_spec.freq = out_sample_rate;
-        wanted_spec.format = AUDIO_S16SYS;
-        wanted_spec.channels = out_channels;
-        wanted_spec.silence = 0;
-        wanted_spec.samples = out_nb_samples;
-        wanted_spec.callback = fill_audio;
-        wanted_spec.userdata = aCodecCtx;
+    //    if (audioStream != -1)
+    //    {
+    //        wanted_spec.freq = out_sample_rate;
+    //        wanted_spec.format = AUDIO_S16SYS;
+    //        wanted_spec.channels = out_channels;
+    //        wanted_spec.silence = 0;
+    //        wanted_spec.samples = out_nb_samples;
+    //        wanted_spec.callback = fill_audio;
+    //        wanted_spec.userdata = aCodecCtx;
 
-        if (SDL_OpenAudio(&wanted_spec, NULL)<0){
-            printf("can't open audio.\n");
-            return -1;
-        }
-    }
+    //        if (SDL_OpenAudio(&wanted_spec, NULL)<0){
+    //            printf("can't open audio.\n");
+    //            return -1;
+    //        }
+    //    }
     bitRate = avFormatContext->bit_rate/1000;
     qDebug() << frameRate << "freamRate " << frameRate;
     for (;;)
@@ -326,7 +345,7 @@ void DecodeThread::slotDoWork(QString palyFile)
         {
             qDebug() << "Do seek";
             int64_t stamp = seek_pos/av_q2d(avFormatContext->streams[videoStream]->time_base);
-             stamp = static_cast<int64_t>(seek_pos);
+            stamp = static_cast<int64_t>(seek_pos);
             // stamp = av_rescale_q(seek_pos,avFormatContext->streams[videoStream]->time_base,avFormatContext->streams[videoStream]->time_base);//当前它实际的位置
             qDebug() << "stamp" << stamp;
             int ret = av_seek_frame(avFormatContext, videoStream, stamp,
@@ -347,8 +366,8 @@ void DecodeThread::slotDoWork(QString palyFile)
                 qDebug() << "Seek successful";
             }
 
-//            emit sigGetCurrentPts(avFormatContext->duration * av_q2d(pVideoCodecContext->time_base),
-//                                  stamp * av_q2d(pVideoCodecContext->time_base));
+            //            emit sigGetCurrentPts(avFormatContext->duration * av_q2d(pVideoCodecContext->time_base),
+            //                                  stamp * av_q2d(pVideoCodecContext->time_base));
             qDebug() << seek_pos;
             isSeek = false;
             av_packet_unref(packet);
@@ -373,7 +392,7 @@ void DecodeThread::slotDoWork(QString palyFile)
                 while (avcodec_receive_frame(pVideoCodecContext, pFrame) == 0)
                 {
                     double video_clock = av_q2d(avFormatContext->streams[videoStream]->time_base) * packet->dts;
-//                    qDebug() << "Dts" << packet->dts;
+                    //                    qDebug() << "Dts" << packet->dts;
                     // qDebug() << "get Dts" << video_clock/av_q2d(avFormatContext->streams[videoStream]->time_base);
                     emit sigGetFrame(pFrame);
                     emit sigGetCurrentPts(total_time,
@@ -392,15 +411,15 @@ void DecodeThread::slotDoWork(QString palyFile)
                     mSleep((1000 / frameRate) - 5);
                 }
             }
-            else if(packet->stream_index == audioStream)
-            {
-                qDebug() << "OPen video decod";
-                std::thread([&](DecodeThread *pointer)
-                {
-                    pointer->decodeAudioThread();
+            //            else if(packet->stream_index == audioStream)
+            //            {
+            //                qDebug() << "OPen video decod";
+            //                std::thread([&](DecodeThread *pointer)
+            //                {
+            //                    pointer->decodeAudioThread();
 
-                }, this).detach();
-            }
+            //                }, this).detach();
+            //            }
             else
             {
                 av_packet_unref(packet);

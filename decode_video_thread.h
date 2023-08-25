@@ -16,19 +16,16 @@ extern "C"
 #include "SDL_render.h"
 }
 
-#define MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
-
 //Output PCM
 #define OUTPUT_PCM 1
 //Use SDL
 #define USE_SDL 1
 
-//Buffer:
-//|-----------|-------------|
-//chunk-------pos---len-----|
-static  Uint8  *audio_chunk;
-static  Uint32  audio_len;
-static  Uint8  *audio_pos;
+#define MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
+
+#define SFM_REFRESH_EVENT (SDL_USEREVENT + 1)
+#define SFM_BREAK_EVENT (SDL_USEREVENT + 2)
+#define MAX_VIDEO_SIZE (25 * 20)
 
 class DecodeThread : public QObject
 {
@@ -48,6 +45,9 @@ public:
     QString decoder;
     QString source_file;
     bool startPlay(QString filePath);
+    int media_decode();
+    int video_decode();
+    int audio_decode();
 
 protected:
     void readVideoFile();
