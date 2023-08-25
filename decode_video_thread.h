@@ -53,7 +53,7 @@ protected:
     void readVideoFile();
     void decodeVideoThread();
     int decodeAudioThread();
-    void fill_audio(void *udata,Uint8 *stream,int len);
+//    void fill_audio(void *udata,Uint8 *stream,int len);
 
     int decodeAudioFrame(bool isBlock = false);
 
