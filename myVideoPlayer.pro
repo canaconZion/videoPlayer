@@ -27,13 +27,14 @@ SOURCES += \
         main.cpp \
     paly_window.cpp \
     decode_video_thread.cpp \
-    audiodecode.cpp \
-    decode_audio_thread.cpp
+    decode_media.cpp \
+    cond.cpp
 
 HEADERS += \
     paly_window.h \
     decode_video_thread.h \
-    audiodecode.h
+    decode_media.h \
+    cond.h
 
 FORMS += \
     paly_window.ui
