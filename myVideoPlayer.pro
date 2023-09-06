@@ -24,17 +24,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 
 SOURCES += \
-        main.cpp \
-    paly_window.cpp \
-    decode_video_thread.cpp \
-    decode_media.cpp \
-    cond.cpp
+        src\main.cpp \
+    src\paly_window.cpp \
+    src\decode_video_thread.cpp \
+    src\cond.cpp
 
 HEADERS += \
-    paly_window.h \
-    decode_video_thread.h \
-    decode_media.h \
-    cond.h
+    src\paly_window.h \
+    src\decode_video_thread.h \
+    src\cond.h
 
 FORMS += \
     paly_window.ui
@@ -43,4 +41,4 @@ INCLUDEPATH += D:\workdir\qt\myVideoPlayer\include\ffmpeg
 INCLUDEPATH += D:\workdir\qt\myVideoPlayer\include\SDL2
 
 LIBS += -LD:\workdir\qt\myVideoPlayer\lib\ffmpeg -lswresample -lavformat -lswscale -lavutil  -lavcodec  -lavdevice -lavfilter
-LIBS += -LD:\workdir\qt\myVideoPlayer\lib\SDL2
+LIBS += -LD:\workdir\qt\myVideoPlayer\lib\SDL2 -lSDL2
