@@ -1,6 +1,5 @@
 #include <QApplication>
 #include "paly_window.h"
-#include "decode_media.h"
 
 #undef main
 int main(int argc, char *argv[])

@@ -27,12 +27,14 @@ SOURCES += \
         src\main.cpp \
     src\paly_window.cpp \
     src\decode_video_thread.cpp \
-    src\cond.cpp
+    src\cond.cpp \
+    src/video_player.cpp
 
 HEADERS += \
     src\paly_window.h \
     src\decode_video_thread.h \
-    src\cond.h
+    src\cond.h \
+    src/video_player.h
 
 FORMS += \
     paly_window.ui

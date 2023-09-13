@@ -9,6 +9,7 @@
 #include <QThread>
 #include "decode_video_thread.h"
 #include <QInputDialog>
+#include "video_player.h"
 extern "C"
 {
 #include "SDL.h"
@@ -51,7 +52,8 @@ public:
 private:
     Ui::paly_window *ui;
     QThread *decode_thread;
-    DecodeThread *do_decode;
+//    DecodeThread *do_decode;
+    VideoPlayer *do_decode;
     SDL_Renderer *sdlRenderer;
     SDL_Texture *sdlTexture;
     SDL_Window *sdlWindow;
