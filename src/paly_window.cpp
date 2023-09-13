@@ -11,7 +11,7 @@
 #include <QContextMenuEvent>
 
 paly_window::paly_window(QWidget *parent) : QWidget(parent),
-                                            ui(new Ui::paly_window)
+    ui(new Ui::paly_window)
 {
     ui->setupUi(this);
 
@@ -43,14 +43,15 @@ paly_window::paly_window(QWidget *parent) : QWidget(parent),
     connect(video_slider, &QSlider::sliderReleased, this, &paly_window::doSeek);
 
     decode_thread = new QThread;
-    do_decode = new DecodeThread;
+    //    do_decode = new DecodeThread;
+    do_decode = new VideoPlayer;
     do_decode->moveToThread(decode_thread);
 
     connect(decode_thread, &QThread::finished, do_decode, &QObject::deleteLater);
     connect(do_decode, SIGNAL(sigGetCurrentPts(long, long)), this, SLOT(updateSlider(long, long)));
     connect(do_decode, SIGNAL(sigGetVideoInfo(int, int)), this, SLOT(settingSdl(int, int)));
     connect(do_decode, SIGNAL(sigGetFrame(AVFrame *)), this, SLOT(updateVideo(AVFrame *)));
-    connect(this, SIGNAL(sigStartPlay(QString)), do_decode, SLOT(slotDoWork(QString)));
+    connect(this, SIGNAL(sigStartPlay(QString)), do_decode, SLOT(read_video_file(QString)));
 }
 
 paly_window::~paly_window()
@@ -62,16 +63,16 @@ paly_window::~paly_window()
 void paly_window::selectFile()
 {
     //    play->setEnabled(true);
-    do_decode->isPause = true;
+    do_decode->v_pause = true;
     pause->setText("继续");
     source_path = "D:/video/videos";
     QString s = QFileDialog::getOpenFileName(
-        this, QStringLiteral("选择要播放的文件"),
-        source_path,
-        QStringLiteral("视频文件 (*.flv *.rmvb *.avi *.MP4 *.mkv);;") + QStringLiteral("音频文件 (*.mp3 *.wma *.wav);;") + QStringLiteral("所有文件 (*.*)"));
+                this, QStringLiteral("选择要播放的文件"),
+                source_path,
+                QStringLiteral("视频文件 (*.flv *.rmvb *.avi *.MP4 *.mkv);;") + QStringLiteral("音频文件 (*.mp3 *.wma *.wav);;") + QStringLiteral("所有文件 (*.*)"));
     if (!s.isEmpty())
     {
-        do_decode->isPlay = false;
+        do_decode->v_play = false;
         source_file = s;
         qDebug() << source_file;
         checkSdl();
@@ -86,7 +87,7 @@ void paly_window::selectFile()
 
 void paly_window::inputNetUrl()
 {
-    do_decode->isPause = true;
+    do_decode->v_pause = true;
     pause->setText("继续");
     bool ok;
     QString text = QInputDialog::getText(nullptr, "打开媒体", "请输入网络URL:", QLineEdit::Normal, QString(), &ok);
@@ -94,7 +95,7 @@ void paly_window::inputNetUrl()
     if (ok && !text.isEmpty())
     {
         qDebug() << "User input: " << text;
-        do_decode->isPlay = false;
+        do_decode->v_play = false;
         source_file = text;
         checkSdl();
         startPlay();
@@ -117,14 +118,14 @@ void paly_window::startPlay()
 
 void paly_window::pausePlay()
 {
-    if (do_decode->isPause)
+    if (do_decode->v_pause)
     {
-        do_decode->isPause = false;
+        do_decode->v_pause = false;
         pause->setText("暂停");
     }
     else
     {
-        do_decode->isPause = true;
+        do_decode->v_pause = true;
         pause->setText("继续");
     }
 }
@@ -134,7 +135,7 @@ void paly_window::quitPlay()
     QMessageBox::StandardButton button = QMessageBox::information(this, "提示", "退出", QMessageBox::Ok, QMessageBox::Cancel);
     if (button == QMessageBox::Ok)
     {
-        do_decode->isPlay = false;
+        do_decode->v_play = false;
         QEventLoop loop;
         QTimer::singleShot(1.5 * 1000, &loop, SLOT(quit()));
         QTimer::singleShot(2 * 1000, this, SLOT(close()));
@@ -144,21 +145,38 @@ void paly_window::quitPlay()
 }
 void paly_window::updateVideo(AVFrame *pFrame)
 {
-    SDL_UpdateYUVTexture(sdlTexture, NULL, pFrame->data[0], pFrame->linesize[0],
-                         pFrame->data[1], pFrame->linesize[1], pFrame->data[2],
-                         pFrame->linesize[2]);
+    if(!pFrame)
+    {
+        qDebug() << "Bad frame";
+        return;
+    }
+    if (!pFrame->data[0] || !pFrame->data[1] || !pFrame->data[2] ||
+            pFrame->linesize[0] < 0 || pFrame->linesize[1] < 0 || pFrame->linesize[2] < 0) {
+        qCritical() << "Bad frame";
+        qDebug() << "Bad frame";
+        return;
+    }
+    qDebug() << "update frame";
+    if (SDL_UpdateYUVTexture(sdlTexture, NULL, pFrame->data[0], pFrame->linesize[0],
+                             pFrame->data[1], pFrame->linesize[1], pFrame->data[2],
+                             pFrame->linesize[2]) < 0) {
+        fprintf(stderr, "SDL_UpdateYUVTexture error: %s\n", SDL_GetError());
+        // 在此处理错误，例如释放资源并退出
+    }
+
     SDL_RenderClear(sdlRenderer);
     SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
     SDL_RenderPresent(sdlRenderer);
+
 }
 
 void paly_window::updateSlider(long TotalTime, long currentTime)
 {
     updateTimeLabel(TotalTime,currentTime);
     double rate = (currentTime + 1) * 1000 / TotalTime;
-//        qDebug() << "Total time" << TotalTime;
-//        qDebug() << "Current time" << currentTime;
-//        qDebug() << "=====================================";
+    //        qDebug() << "Total time" << TotalTime;
+    //        qDebug() << "Current time" << currentTime;
+    //        qDebug() << "=====================================";
     if (!video_slider->isSliderDown())
     {
         video_slider->setValue(rate);
@@ -264,7 +282,7 @@ void paly_window::getMousePos()
 void paly_window::doSeek()
 {
     slider_pos = video_slider->value();
-//    double rate = (currentTime + 1) * 10000 / TotalTime;
+    //    double rate = (currentTime + 1) * 10000 / TotalTime;
     qDebug() << "Total time" << do_decode->total_time;
     qDebug() << "slider moved" << slider_pos;
     long seek_dts = do_decode->total_time * slider_pos;
@@ -284,13 +302,13 @@ void paly_window::videoMsgWin()
                               "\n🎞视频时长: %6\n"
                               "\n🎞视频码率: %7 kbps\n"
                               "\n")
-                          .arg(video_decoder,
-                               video_width,
-                               video_height,
-                               video_rate,
-                               source_file,
-                               totalTime,
-                               QString::number(do_decode->bitRate));
+            .arg(video_decoder,
+                 video_width,
+                 video_height,
+                 video_rate,
+                 source_file,
+                 totalTime,
+                 QString::number(do_decode->bitRate));
     msgBox->setAttribute(Qt::WA_DeleteOnClose);
     msgBox->setWindowTitle(tr("媒体信息"));
     //    msgBox->resize(300,400);
