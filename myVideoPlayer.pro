@@ -28,7 +28,8 @@ SOURCES += \
     src\paly_window.cpp \
     src\decode_video_thread.cpp \
     src\cond.cpp \
-    src/video_player.cpp
+    src/video_player.cpp \
+    src/decode_audio_thread.cpp
 
 HEADERS += \
     src\paly_window.h \
