@@ -51,7 +51,7 @@ paly_window::paly_window(QWidget *parent) : QWidget(parent),
     connect(do_decode, SIGNAL(sigGetCurrentPts(long, long)), this, SLOT(updateSlider(long, long)));
     connect(do_decode, SIGNAL(sigGetVideoInfo(int, int)), this, SLOT(settingSdl(int, int)));
     connect(do_decode, SIGNAL(sigGetFrame(AVFrame *)), this, SLOT(updateVideo(AVFrame *)));
-    connect(this, SIGNAL(sigStartPlay(QString)), do_decode, SLOT(read_video_file(QString)));
+    connect(this, SIGNAL(sigStartPlay(QString)), do_decode, SLOT(start_play(QString)));
 }
 
 paly_window::~paly_window()
@@ -121,12 +121,12 @@ void paly_window::pausePlay()
     if (do_decode->v_pause)
     {
         do_decode->v_pause = false;
-        pause->setText("暂停");
+        pause->setText("暂停⏸");
     }
     else
     {
         do_decode->v_pause = true;
-        pause->setText("继续");
+        pause->setText("继续▶");
     }
 }
 
@@ -283,20 +283,20 @@ void paly_window::doSeek()
 {
     slider_pos = video_slider->value();
     //    double rate = (currentTime + 1) * 10000 / TotalTime;
-    qDebug() << "Total time" << do_decode->total_time;
+    qDebug() << "Total time" << do_decode->v_total_time;
     qDebug() << "slider moved" << slider_pos;
-    long seek_dts = do_decode->total_time * slider_pos;
+    long seek_dts = do_decode->v_total_time * slider_pos;
     qDebug() << "seek_dts " << seek_dts;
     do_decode->seek_pos = seek_dts;
-    do_decode->isSeek = true;
+    do_decode->v_isSeek = true;
 }
 
 void paly_window::videoMsgWin()
 {
     QMessageBox *msgBox = new QMessageBox;
-    video_rate = QString::number(do_decode->frameRate);
-    video_decoder = do_decode->decoder;
-    qDebug() << "视频帧率 " << do_decode->frameRate;
+    video_rate = QString::number(do_decode->v_frameRate);
+    video_decoder = do_decode->v_decoder;
+    qDebug() << "视频帧率 " << do_decode->v_frameRate;
     QString message = QString("\n🎞媒体源: %5\n\n🎞视频编解码器: %1\n"
                               "\n🎞视频分辨率: %2x%3\n\n🎞视频帧率: %4\n"
                               "\n🎞视频时长: %6\n"
@@ -308,7 +308,7 @@ void paly_window::videoMsgWin()
                  video_rate,
                  source_file,
                  totalTime,
-                 QString::number(do_decode->bitRate));
+                 QString::number(do_decode->v_bitRate));
     msgBox->setAttribute(Qt::WA_DeleteOnClose);
     msgBox->setWindowTitle(tr("媒体信息"));
     //    msgBox->resize(300,400);

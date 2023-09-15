@@ -5,15 +5,26 @@
 #include <thread>
 extern "C"
 {
-#include "libavformat/avformat.h"
-#include "libavcodec/avcodec.h"
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/time.h>
+#include <libavutil/pixfmt.h>
+#include <libavutil/display.h>
+#include <libavutil/avstring.h>
+#include <libavutil/opt.h>
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
-#include <libavutil/time.h>
-#include "SDL.h"
-#include "SDL_video.h"
-#include "SDL_rect.h"
-#include "SDL_render.h"
+#include <libavutil/imgutils.h>
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
+
+#include <SDL.h>
+#include <SDL_audio.h>
+#include <SDL_types.h>
+#include <SDL_name.h>
+#include <SDL_main.h>
+#include <SDL_config.h>
 }
 
 #include "cond.h"
@@ -23,9 +34,11 @@ extern "C"
 #define USE_SDL 1
 
 #define MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
+#define AVCODEC_MAX_AUDIO_FRAME_SIZE 192000
 
 #define SFM_REFRESH_EVENT (SDL_USEREVENT + 1)
 #define SFM_BREAK_EVENT (SDL_USEREVENT + 2)
+
 #define MAX_AUDIO_SIZE (50 * 20)
 #define MAX_VIDEO_SIZE (25 * 20)
 
@@ -44,14 +57,14 @@ public:
     bool v_pause;
     bool v_play;
     // ------ old element --------
-    bool isSeek;
-    bool isFileChange;
-    long total_time;
-    long curr_time;
+    bool v_isSeek;
+    bool v_isFileChange;
+    long v_total_time;
+    long v_curr_time;
     long seek_pos;
-    double frameRate;
-    int bitRate;
-    QString decoder;
+    double v_frameRate;
+    int v_bitRate;
+    QString v_decoder;
     // ----------------------------
 
 
@@ -81,6 +94,16 @@ private:
     AVFrame *aFrame_ReSample;
     SwrContext *swrCtx;
 
+    enum AVSampleFormat in_sample_fmt; //输入的采样格式
+    enum AVSampleFormat out_sample_fmt;//输出的采样格式 16bit PCM
+    int in_sample_rate;//输入的采样率
+    int out_sample_rate;//输出的采样率
+    int audio_tgt_channels; ///av_get_channel_layout_nb_channels(out_ch_layout);
+    int out_ch_layout;
+    unsigned int audio_buf_size;
+    unsigned int audio_buf_index;
+    DECLARE_ALIGNED(16,uint8_t,audio_buf) [AVCODEC_MAX_AUDIO_FRAME_SIZE * 4];
+
     // 视频队列
     Cond *mConditon_Video;
     std::list<AVPacket> mVideoPacktList;
@@ -93,16 +116,30 @@ private:
     bool inputAudioQuene(const AVPacket &pkt);
     void clearAudioQuene();
 
+    SDL_AudioDeviceID mAudioID;
+    int set_audio_SDL();
+    void close_audio_SDL();
+
+    int configure_filtergraph(AVFilterGraph *graph, const char *filtergraph, AVFilterContext *source_ctx, AVFilterContext *sink_ctx);
+    int configure_video_filters(AVFilterGraph *graph, const char *vfilters, AVFrame *frame);
+
 protected:
+    void read_video_file();
     void decode_video_thread();
-    void decode_audio_thread();
+    int decode_audio_thread(bool isBlock = false);
+
+    static void sdlAudioCallBackFunc(void *userdata, Uint8 *stream, int len);
+    void sdlAudioCallBack(Uint8 *stream, int len);
+
 
 signals:
     void sigGetFrame(AVFrame *pFrame);
+    void sigGetVideoInfo(int mWidth, int mHeight);
+    void sigGetCurrentPts(long, long);
 
 public slots:
-//    bool start_play(QString file_path);
-    void read_video_file(QString file_path);
+    bool start_play(QString file_path);
+
 
 };
 

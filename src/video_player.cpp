@@ -20,6 +20,7 @@ void v_mSleep(int msec)
     do
     {
         now = QTime::currentTime();
+        //        qDebug() << "Sleeping";
     } while (n.msecsTo(now) <= msec);
 }
 
@@ -28,29 +29,28 @@ bool VideoPlayer::init_player()
     return true;
 }
 
-//bool VideoPlayer::start_play(QString file_path)
-//{
-//    qDebug() << "start_play";
-//    //    printf("%s\n",__func__);
-//    v_quit = false;
-//    v_pause = false;
-//    v_file_path = file_path;
-//    std::thread([&](VideoPlayer *pointer)
-//    {
-//        pointer->read_video_file();
-
-//    }, this).detach();
-
-//    return true;
-
-//}
-
-void VideoPlayer::read_video_file(QString file_path)
+bool VideoPlayer::start_play(QString file_path)
 {
-    qDebug() << "read video file";
+    qDebug() << "start_play";
+    //    printf("%s\n",__func__);
     v_quit = false;
     v_pause = false;
-    QByteArray byteArray = file_path.toUtf8();
+    v_read_finished = false;
+    v_file_path = file_path;
+    std::thread([&](VideoPlayer *pointer)
+    {
+        pointer->read_video_file();
+
+    }, this).detach();
+
+    return true;
+
+}
+
+void VideoPlayer::read_video_file()
+{
+    qDebug() << "read video file";
+    QByteArray byteArray = v_file_path.toUtf8();
     char *video_file = byteArray.data();
 
     pCodecCtx = nullptr;
@@ -100,9 +100,13 @@ void VideoPlayer::read_video_file(QString file_path)
             audio_stream = i;
         }
     }
-
     if(video_stream >=0)
     {
+        // get video msg
+        v_bitRate = pFormatCtx->bit_rate/1000;
+        v_total_time = pFormatCtx->duration/1000000;
+        v_frameRate = av_q2d(pFormatCtx->streams[video_stream]->r_frame_rate);
+
         pCodecCtx = pFormatCtx->streams[video_stream]->codec;
         pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
         if(pCodec == nullptr)
@@ -110,6 +114,7 @@ void VideoPlayer::read_video_file(QString file_path)
             qCritical() << "Could not find PCodec";
             goto end;
         }
+        v_decoder = QString(pCodec->long_name);
         if(avcodec_open2(pCodecCtx,pCodec,NULL) < 0)
         {
             qCritical() << "Could not open video codec";
@@ -117,6 +122,10 @@ void VideoPlayer::read_video_file(QString file_path)
         }
         mVideoStream = pFormatCtx->streams[video_stream];
 
+        // send video size
+        emit sigGetVideoInfo(pCodecCtx->width, pCodecCtx->height);
+
+        // decode video
         std::thread([&](VideoPlayer *pointer)
         {
             pointer->decode_video_thread();
@@ -129,50 +138,134 @@ void VideoPlayer::read_video_file(QString file_path)
 
         if (aCodec == NULL)
         {
-            qCritical() << "Could not find Acodec";
+            qCritical() <<  "Could not find audio codec.";
             audio_stream = -1;
         }
         else
         {
             if (avcodec_open2(aCodecCtx, aCodec, nullptr) < 0)
             {
-                fprintf(stderr, "Could not open audio codec.\n");
-                //                doOpenVideoFileFailed();
+                qCritical() << "Could not open audio codec.";
                 goto end;
             }
+
             aFrame = av_frame_alloc();
+            aFrame_ReSample = nullptr;
+            swrCtx = nullptr;
+            int in_ch_layout;
+            out_ch_layout = av_get_default_channel_layout(audio_tgt_channels); ///AV_CH_LAYOUT_STEREO
+
+            out_ch_layout &= ~AV_CH_LAYOUT_STEREO_DOWNMIX;
+
+            in_sample_fmt = aCodecCtx->sample_fmt;
+            out_sample_fmt = AV_SAMPLE_FMT_S16;
+            in_sample_rate = aCodecCtx->sample_rate;
+            in_ch_layout = aCodecCtx->channel_layout;
+            out_sample_rate = aCodecCtx->sample_rate;
+
+            //输出的声道布局
+
+            audio_tgt_channels = 2; ///av_get_channel_layout_nb_channels(out_ch_layout);
+            out_ch_layout = av_get_default_channel_layout(audio_tgt_channels); ///AV_CH_LAYOUT_STEREO
+
+            out_ch_layout &= ~AV_CH_LAYOUT_STEREO_DOWNMIX;
+
+            /// 2019-5-13添加
+            /// wav/wmv 文件获取到的aCodecCtx->channel_layout为0会导致后面的初始化失败，因此这里需要加个判断。
+            if (in_ch_layout <= 0)
+            {
+                in_ch_layout = av_get_default_channel_layout(aCodecCtx->channels);
+            }
+
+            swrCtx = swr_alloc_set_opts(nullptr, out_ch_layout, out_sample_fmt, out_sample_rate,
+                                        in_ch_layout, in_sample_fmt, in_sample_rate, 0, nullptr);
+
+            /** Open the resampler with the specified parameters. */
+            int ret = swr_init(swrCtx);
+            if (ret < 0)
+            {
+                char buff[128]={0};
+                av_strerror(ret, buff, 128);
+
+                qCritical() << "Could not open resample context "<< buff;
+                swr_free(&swrCtx);
+                swrCtx = nullptr;
+                goto end;
+            }
+
+            //存储pcm数据
+            int out_linesize = out_sample_rate * audio_tgt_channels;
+
+            //        out_linesize = av_samples_get_buffer_size(NULL, audio_tgt_channels, av_get_bytes_per_sample(out_sample_fmt), out_sample_fmt, 1);
+            out_linesize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+
+
+            mAudioStream = pFormatCtx->streams[audio_stream];
+
+            ///打开SDL播放声音
+            int code = set_audio_SDL();
+
+            if (code == 0)
+            {
+                SDL_LockAudioDevice(mAudioID);
+                SDL_PauseAudioDevice(mAudioID,0);
+                SDL_UnlockAudioDevice(mAudioID);
+
+                v_audio_thread_finished = false;
+            }
+            else
+            {
+                qCritical() << "Open audio sdl failed!";
+            }
         }
     }
     while(1)
     {
-        if (mAudioPacktList.size() > MAX_AUDIO_SIZE || mVideoPacktList.size() > MAX_VIDEO_SIZE)
+        if(v_pause == false)
         {
-            v_mSleep(10);
-            continue;
-        }
-        AVPacket packet;
-        if(av_read_frame(pFormatCtx,&packet) <0)
-        {
-            v_read_finished = true;
-            if(v_quit)
+            // if (mVideoPacktList.size() > MAX_VIDEO_SIZE)
+            if (mAudioPacktList.size() > MAX_AUDIO_SIZE || mVideoPacktList.size() > MAX_VIDEO_SIZE)
             {
-                break;
+                qDebug() << mVideoPacktList.size();
+                v_mSleep(10);
+                continue;
             }
-            v_mSleep(10);
-            continue;
-        }
-        if(packet.stream_index == video_stream)
-        {
-            inputVideoQuene(packet);
-        }
-        else if(packet.stream_index == audio_stream)
-        {
-            inputAudioQuene(packet);
+            AVPacket packet;
+            if(av_read_frame(pFormatCtx,&packet) <0)
+            {
+                v_read_finished = true;
+                if(v_quit)
+                {
+                    break;
+                }
+                v_mSleep(10);
+                continue;
+            }
+            if(packet.stream_index == video_stream)
+            {
+                inputVideoQuene(packet);
+            }
+            else if(packet.stream_index == audio_stream)
+            {
+                if(v_audio_thread_finished == true)
+                {
+                    av_packet_unref(&packet);
+                }
+                else
+                {
+                    inputAudioQuene(packet);
+                }
+            }
+            else
+            {
+                av_packet_unref(&packet);
+            }
         }
         else
         {
-            av_packet_unref(&packet);
+            v_mSleep(5);
         }
+
     }
     while(!v_quit)
     {
@@ -180,6 +273,7 @@ void VideoPlayer::read_video_file(QString file_path)
     }
 
 end:
+    qDebug() << "play video finished!";
     clearAudioQuene();
     clearVideoQuene();
 
@@ -213,6 +307,7 @@ end:
         pCodecCtx = nullptr;
     }
 
+    close_audio_SDL();
     avformat_close_input(&pFormatCtx);
     avformat_free_context(pFormatCtx);
 
@@ -227,7 +322,7 @@ void VideoPlayer::decode_video_thread()
     double video_pts = 0;
     double audio_pts = 0;
 
-//    const char *outputFileName = "output_frame.png";
+    //    const char *outputFileName = "output_frame.png";
 
     AVFrame *pFrame = nullptr;
     AVFrame *pFrameYUV = nullptr;
@@ -240,53 +335,83 @@ void VideoPlayer::decode_video_thread()
     mConditon_Video->Lock();
     while(1)
     {
-        if(mVideoPacktList.size()<0)
+        if(v_pause == false)
         {
-            v_mSleep(1);
-            continue;
-        }
-        AVPacket pkt1 = mVideoPacktList.front();
-        mVideoPacktList.pop_front();
-        mConditon_Video->Unlock();
+            if(mVideoPacktList.size()<=0)
+            {
+                mConditon_Video->Unlock();
+                if(v_read_finished == true)
+                {
+                    //                v_video_thread_finished=true;
+                    qDebug() << "video decode finished.";
+                    break;
+                }
+                else
+                {
+                    qDebug() << "empty list";
+                    v_mSleep(1);
+                    continue;
+                }
+            }
+            AVPacket pkt1 = mVideoPacktList.front();
+            mVideoPacktList.pop_front();
+            mConditon_Video->Unlock();
 
-        AVPacket *packet = &pkt1;
+            AVPacket *packet = &pkt1;
 
-        if(strcmp((char*)packet->data, FLUSH_DATA) == 0)
-        {
-            avcodec_flush_buffers(mVideoStream->codec);
+            if(strcmp((char*)packet->data, FLUSH_DATA) == 0)
+            {
+                avcodec_flush_buffers(mVideoStream->codec);
+                av_packet_unref(packet);
+                continue;
+            }
+            if (avcodec_send_packet(pCodecCtx, packet) != 0)
+            {
+                qDebug("input AVPacket to decoder failed!\n");
+                av_packet_unref(packet);
+                continue;
+            }
+            while(avcodec_receive_frame(pCodecCtx,pFrame) == 0)
+            {
+                if(packet->dts == AV_NOPTS_VALUE && pFrame->opaque&& *(uint64_t*) pFrame->opaque != AV_NOPTS_VALUE)
+                {
+                    video_pts = *(uint64_t *) pFrame->opaque;
+                }
+                else if (packet->dts != AV_NOPTS_VALUE)
+                {
+                    video_pts = packet->dts;
+                }
+                else
+                {
+                    video_pts = 0;
+                }
+                video_pts *= av_q2d(mVideoStream->time_base);
+                video_clock = video_pts;
+                // TODO:发生跳转
+                // TODO:音视频同步
+                qDebug() << "-----send one frame-------" << video_pts;
+                emit sigGetFrame(pFrame);
+                emit sigGetCurrentPts(v_total_time,video_clock);
+                // TODO:发送时间戳
+                // TODO:解码间隔
+                // total_duration = 获取视频总时长()  # 单位：秒
+                // frame_rate = 获取视频帧率()  # 帧每秒
+                // # 计算每帧的时间间隔
+                // frame_interval = 1.0 / frame_rate
+                // # 计算视频中总共有多少帧
+                // total_frames = total_duration * frame_rate
+                // # 计算每个视频帧的解码间隔时间
+                // frame_decode_interval = total_duration / total_frames
+
+                v_mSleep(40);
+            }
             av_packet_unref(packet);
-            continue;
         }
-        if (avcodec_send_packet(pCodecCtx, packet) != 0)
+        else
         {
-            qDebug("input AVPacket to decoder failed!\n");
-            av_packet_unref(packet);
-            continue;
+            v_mSleep(5);
         }
-        while(avcodec_receive_frame(pCodecCtx,pFrame) == 0)
-        {
-            if(packet->dts == AV_NOPTS_VALUE && pFrame->opaque&& *(uint64_t*) pFrame->opaque != AV_NOPTS_VALUE)
-            {
-                video_pts = *(uint64_t *) pFrame->opaque;
-            }
-            else if (packet->dts != AV_NOPTS_VALUE)
-            {
-                video_pts = packet->dts;
-            }
-            else
-            {
-                video_pts = 0;
-            }
-            video_pts *= av_q2d(mVideoStream->time_base);
-            video_clock = video_pts;
-            // TODO:发生跳转
-            // TODO:音视频同步
-            qDebug() << "-----send one frame-------" << video_pts;
-            emit sigGetFrame(pFrame);
-            // TODO:发送时间戳
-            v_mSleep(50);
-        }
-        av_packet_unref(packet);
+
     }
     av_free(pFrame);
     if (pFrameYUV != nullptr)
@@ -313,11 +438,6 @@ void VideoPlayer::decode_video_thread()
     return;
 }
 
-void VideoPlayer::decode_audio_thread()
-{
-
-}
-
 
 bool VideoPlayer::inputVideoQuene(const AVPacket &pkt)
 {
@@ -325,7 +445,7 @@ bool VideoPlayer::inputVideoQuene(const AVPacket &pkt)
     {
         return false;
     }
-    //    qDebug() << "+++++Input 1 video packet++++++" ;
+    qDebug() << "+++++Input 1 video packet++++++" ;
     mConditon_Video->Lock();
     mVideoPacktList.push_back(pkt);
     mConditon_Video->Signal();
@@ -371,5 +491,53 @@ void VideoPlayer::clearAudioQuene()
     }
     mAudioPacktList.clear();
     mConditon_Audio->Unlock();
+}
+
+
+int VideoPlayer::set_audio_SDL()
+{
+    SDL_AudioSpec wanted_spec, spec;
+    int wanted_nb_channels = 2;
+    int samplerate = out_sample_rate;
+
+    wanted_spec.channels = wanted_nb_channels;
+    wanted_spec.samples = FFMAX(512, 2 << av_log2(wanted_spec.freq / 30));
+    wanted_spec.freq = samplerate;
+    wanted_spec.format = AUDIO_S16SYS;
+    wanted_spec.silence = 0;
+
+    wanted_spec.callback = sdlAudioCallBackFunc;
+    wanted_spec.userdata = this;
+
+    int num = SDL_GetNumAudioDevices(0);
+    for (int i=0;i<num;i++)
+    {
+        mAudioID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(i,0), false, &wanted_spec, &spec,0);
+        if (mAudioID > 0)
+        {
+            break;
+        }
+    }
+
+    if (mAudioID <= 0)
+    {
+        v_audio_thread_finished = true;
+        return -1;
+    }
+    qCritical() << "mAudioID = " << mAudioID;
+    return 0;
+}
+
+void VideoPlayer::close_audio_SDL()
+{
+    if (mAudioID > 0)
+    {
+        SDL_LockAudioDevice(mAudioID);
+        SDL_PauseAudioDevice(mAudioID, 1);
+        SDL_UnlockAudioDevice(mAudioID);
+        SDL_CloseAudioDevice(mAudioID);
+    }
+
+    mAudioID = 0;
 }
 
