@@ -219,52 +219,62 @@ void VideoPlayer::read_video_file()
             }
         }
     }
+    v_start_play_time = av_gettime();
     while(1)
     {
-        if(v_pause == false)
+        //        if(v_pause == false)
+        //        {
+        // if (mVideoPacktList.size() > MAX_VIDEO_SIZE)
+        if(v_quit == true)
         {
-            // if (mVideoPacktList.size() > MAX_VIDEO_SIZE)
-            if (mAudioPacktList.size() > MAX_AUDIO_SIZE || mVideoPacktList.size() > MAX_VIDEO_SIZE)
+            break;
+        }
+        if (mAudioPacktList.size() > MAX_AUDIO_SIZE || mVideoPacktList.size() > MAX_VIDEO_SIZE)
+        {
+            // qDebug() << mVideoPacktList.size();
+            v_mSleep(10);
+            continue;
+        }
+        if(v_pause == true)
+        {
+            v_mSleep(10);
+            continue;
+        }
+        AVPacket packet;
+        if(av_read_frame(pFormatCtx,&packet) <0)
+        {
+            v_read_finished = true;
+            if(v_quit)
             {
-                qDebug() << mVideoPacktList.size();
-                v_mSleep(10);
-                continue;
+                break;
             }
-            AVPacket packet;
-            if(av_read_frame(pFormatCtx,&packet) <0)
+            v_mSleep(10);
+            continue;
+        }
+        if(packet.stream_index == video_stream)
+        {
+            inputVideoQuene(packet);
+        }
+        else if(packet.stream_index == audio_stream)
+        {
+            if(v_audio_thread_finished == true)
             {
-                v_read_finished = true;
-                if(v_quit)
-                {
-                    break;
-                }
-                v_mSleep(10);
-                continue;
-            }
-            if(packet.stream_index == video_stream)
-            {
-                inputVideoQuene(packet);
-            }
-            else if(packet.stream_index == audio_stream)
-            {
-                if(v_audio_thread_finished == true)
-                {
-                    av_packet_unref(&packet);
-                }
-                else
-                {
-                    inputAudioQuene(packet);
-                }
+                av_packet_unref(&packet);
             }
             else
             {
-                av_packet_unref(&packet);
+                inputAudioQuene(packet);
             }
         }
         else
         {
-            v_mSleep(5);
+            av_packet_unref(&packet);
         }
+        //        }
+        //        else
+        //        {
+        //            v_mSleep(5);
+        //        }
 
     }
     while(!v_quit)
@@ -335,84 +345,114 @@ void VideoPlayer::decode_video_thread()
     mConditon_Video->Lock();
     while(1)
     {
-        if(v_pause == false)
+        if(v_quit == true)
         {
-            if(mVideoPacktList.size()<=0)
+            qDebug() << "break decode";
+            break;
+        }
+        if(mVideoPacktList.size()<=0)
+        {
+            mConditon_Video->Unlock();
+            if(v_read_finished == true)
             {
-                mConditon_Video->Unlock();
-                if(v_read_finished == true)
+                //                v_video_thread_finished=true;
+                qDebug() << "video decode finished.";
+                break;
+            }
+            else
+            {
+                qDebug() << "empty list";
+                v_mSleep(1);
+                continue;
+            }
+        }
+        AVPacket pkt1 = mVideoPacktList.front();
+        mVideoPacktList.pop_front();
+        mConditon_Video->Unlock();
+
+        AVPacket *packet = &pkt1;
+
+        if(strcmp((char*)packet->data, FLUSH_DATA) == 0)
+        {
+            avcodec_flush_buffers(mVideoStream->codec);
+            av_packet_unref(packet);
+            continue;
+        }
+        if (avcodec_send_packet(pCodecCtx, packet) != 0)
+        {
+            qDebug("input AVPacket to decoder failed!\n");
+            av_packet_unref(packet);
+            continue;
+        }
+        while(avcodec_receive_frame(pCodecCtx,pFrame) == 0)
+        {
+            if(packet->dts == AV_NOPTS_VALUE && pFrame->opaque&& *(uint64_t*) pFrame->opaque != AV_NOPTS_VALUE)
+            {
+                video_pts = *(uint64_t *) pFrame->opaque;
+            }
+            else if (packet->dts != AV_NOPTS_VALUE)
+            {
+                video_pts = packet->dts;
+            }
+            else
+            {
+                video_pts = 0;
+            }
+            video_pts *= av_q2d(mVideoStream->time_base);
+            video_clock = video_pts;
+            // TODO:发生跳转
+            qDebug() << "-----send one frame-------" << video_pts;
+            while(1)
+            {
+                if (v_quit)
                 {
-                    //                v_video_thread_finished=true;
-                    qDebug() << "video decode finished.";
                     break;
                 }
-                else
-                {
-                    qDebug() << "empty list";
-                    v_mSleep(1);
-                    continue;
-                }
-            }
-            AVPacket pkt1 = mVideoPacktList.front();
-            mVideoPacktList.pop_front();
-            mConditon_Video->Unlock();
 
-            AVPacket *packet = &pkt1;
-
-            if(strcmp((char*)packet->data, FLUSH_DATA) == 0)
-            {
-                avcodec_flush_buffers(mVideoStream->codec);
-                av_packet_unref(packet);
-                continue;
-            }
-            if (avcodec_send_packet(pCodecCtx, packet) != 0)
-            {
-                qDebug("input AVPacket to decoder failed!\n");
-                av_packet_unref(packet);
-                continue;
-            }
-            while(avcodec_receive_frame(pCodecCtx,pFrame) == 0)
-            {
-                if(packet->dts == AV_NOPTS_VALUE && pFrame->opaque&& *(uint64_t*) pFrame->opaque != AV_NOPTS_VALUE)
+                if (mAudioStream != NULL && !v_audio_thread_finished)
                 {
-                    video_pts = *(uint64_t *) pFrame->opaque;
-                }
-                else if (packet->dts != AV_NOPTS_VALUE)
-                {
-                    video_pts = packet->dts;
+                    if (v_read_finished && mAudioPacktList.size() <= 0)
+                    {
+                        break;
+                    }
+                    audio_pts = audio_clock;
                 }
                 else
                 {
-                    video_pts = 0;
+                    audio_pts = (av_gettime() - v_start_play_time) / 1000000.0;
+                    audio_clock = audio_pts;
                 }
-                video_pts *= av_q2d(mVideoStream->time_base);
-                video_clock = video_pts;
-                // TODO:发生跳转
-                // TODO:音视频同步
-                qDebug() << "-----send one frame-------" << video_pts;
+                video_pts = video_clock;
+
+                if (video_pts <= audio_pts) break;
+                if (v_pause) break;
+
+                int delayTime = (video_pts - audio_pts) * 1000;
+                qDebug() << "delayTime ------" << delayTime;
+
+                delayTime = delayTime > 5 ? 5:delayTime;
+                v_mSleep(delayTime);
+
+            }
+            emit sigGetFrame(pFrame);
+            emit sigGetCurrentPts(v_total_time,video_clock);
+
+            //            qDebug() << "---sleep---" << 1000/v_frameRate;
+            //                v_mSleep(1000/v_frameRate);
+            v_mSleep(1);
+            while(v_pause == true)
+            {
                 emit sigGetFrame(pFrame);
-                emit sigGetCurrentPts(v_total_time,video_clock);
-                // TODO:发送时间戳
-                // TODO:解码间隔
-                // total_duration = 获取视频总时长()  # 单位：秒
-                // frame_rate = 获取视频帧率()  # 帧每秒
-                // # 计算每帧的时间间隔
-                // frame_interval = 1.0 / frame_rate
-                // # 计算视频中总共有多少帧
-                // total_frames = total_duration * frame_rate
-                // # 计算每个视频帧的解码间隔时间
-                // frame_decode_interval = total_duration / total_frames
-
+                if(v_quit)
+                {
+                    break;
+                }
                 v_mSleep(40);
             }
-            av_packet_unref(packet);
         }
-        else
-        {
-            v_mSleep(5);
-        }
-
+        av_packet_unref(packet);
     }
+    qDebug() << "clear video";
     av_free(pFrame);
     if (pFrameYUV != nullptr)
     {
@@ -445,7 +485,7 @@ bool VideoPlayer::inputVideoQuene(const AVPacket &pkt)
     {
         return false;
     }
-    qDebug() << "+++++Input 1 video packet++++++" ;
+    //    qDebug() << "+++++Input 1 video packet++++++" ;
     mConditon_Video->Lock();
     mVideoPacktList.push_back(pkt);
     mConditon_Video->Signal();

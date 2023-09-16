@@ -59,7 +59,7 @@
           <string notr="true">QPushButton{background-color:rgb(255,255,224);}</string>
          </property>
          <property name="text">
-          <string>播放</string>
+          <string>结束播放</string>
          </property>
         </widget>
        </item>

@@ -7,8 +7,20 @@
 #include <QTimer>
 #include <QWidget>
 #include <QMenu>
+#include <QTime>
 #include <QAction>
 #include <QContextMenuEvent>
+
+void m_mSleep(int msec)
+{
+    QTime n = QTime::currentTime();
+    QTime now;
+    do
+    {
+        now = QTime::currentTime();
+        //        qDebug() << "Sleeping";
+    } while (n.msecsTo(now) <= msec);
+}
 
 paly_window::paly_window(QWidget *parent) : QWidget(parent),
     ui(new Ui::paly_window)
@@ -37,7 +49,7 @@ paly_window::paly_window(QWidget *parent) : QWidget(parent),
 
     connect(select, &QPushButton::clicked, this, &paly_window::selectFile);
     connect(net_butt, &QPushButton::clicked, this, &paly_window::inputNetUrl);
-    connect(play, &QPushButton::clicked, this, &paly_window::startPlay);
+    connect(play, &QPushButton::clicked, this, &paly_window::quit_play);
     connect(pause, &QPushButton::clicked, this, &paly_window::pausePlay);
     connect(quit, &QPushButton::clicked, this, &paly_window::quitPlay);
     connect(video_slider, &QSlider::sliderReleased, this, &paly_window::doSeek);
@@ -63,7 +75,7 @@ paly_window::~paly_window()
 void paly_window::selectFile()
 {
     //    play->setEnabled(true);
-    do_decode->v_pause = true;
+//    do_decode->v_pause = true;
     pause->setText("继续");
     source_path = "D:/video/videos";
     QString s = QFileDialog::getOpenFileName(
@@ -72,7 +84,10 @@ void paly_window::selectFile()
                 QStringLiteral("视频文件 (*.flv *.rmvb *.avi *.MP4 *.mkv);;") + QStringLiteral("音频文件 (*.mp3 *.wma *.wav);;") + QStringLiteral("所有文件 (*.*)"));
     if (!s.isEmpty())
     {
-        do_decode->v_play = false;
+//        do_decode->v_play = false;
+        do_decode->v_quit = true;
+        emit play->clicked();
+        m_mSleep(1000);
         source_file = s;
         qDebug() << source_file;
         checkSdl();
@@ -85,6 +100,12 @@ void paly_window::selectFile()
     //    select->setEnabled(false);
 }
 
+void paly_window::quit_play()
+{
+    qDebug() << "Quit play.";
+    do_decode->v_quit = true;
+}
+
 void paly_window::inputNetUrl()
 {
     do_decode->v_pause = true;
@@ -95,7 +116,6 @@ void paly_window::inputNetUrl()
     if (ok && !text.isEmpty())
     {
         qDebug() << "User input: " << text;
-        do_decode->v_play = false;
         source_file = text;
         checkSdl();
         startPlay();
@@ -107,13 +127,16 @@ void paly_window::inputNetUrl()
     }
 }
 
+
+
+
 void paly_window::startPlay()
 {
     pausePlay();
     decode_thread->start();
     qDebug() << "文件：" << source_file;
     emit sigStartPlay(source_file);
-    play->setEnabled(false);
+//    play->setEnabled(false);
 }
 
 void paly_window::pausePlay()
@@ -143,25 +166,26 @@ void paly_window::quitPlay()
     }
     qDebug() << "stop play";
 }
+
 void paly_window::updateVideo(AVFrame *pFrame)
 {
-    if(!pFrame)
-    {
-        qDebug() << "Bad frame";
-        return;
-    }
+//    if(!pFrame)
+//    {
+//        qDebug() << "Bad frame";
+//        return;
+//    }
     if (!pFrame->data[0] || !pFrame->data[1] || !pFrame->data[2] ||
             pFrame->linesize[0] < 0 || pFrame->linesize[1] < 0 || pFrame->linesize[2] < 0) {
         qCritical() << "Bad frame";
-        qDebug() << "Bad frame";
+//        qDebug() << "Bad frame";
         return;
     }
     qDebug() << "update frame";
     if (SDL_UpdateYUVTexture(sdlTexture, NULL, pFrame->data[0], pFrame->linesize[0],
                              pFrame->data[1], pFrame->linesize[1], pFrame->data[2],
                              pFrame->linesize[2]) < 0) {
-        fprintf(stderr, "SDL_UpdateYUVTexture error: %s\n", SDL_GetError());
-        // 在此处理错误，例如释放资源并退出
+        qCritical() <<"SDL_UpdateYUVTexture error: "<< SDL_GetError();
+        return;
     }
 
     SDL_RenderClear(sdlRenderer);
@@ -213,12 +237,12 @@ void paly_window::checkSdl()
 {
     if(sdlRenderer != nullptr)
     {
-        qDebug() << "clear sdl";
+        qDebug() << "clear sdlRenderer";
         SDL_DestroyRenderer(sdlRenderer);
     }
     if(sdlTexture != nullptr)
     {
-        qDebug() << "clear text";
+        qDebug() << "clear texture";
         SDL_DestroyTexture(sdlTexture);
     }
 }

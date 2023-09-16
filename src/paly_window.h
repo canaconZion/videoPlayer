@@ -71,6 +71,7 @@ public slots:
     void startPlay();
     void pausePlay();
     void quitPlay();
+    void quit_play();
     void selectFile();
     void inputNetUrl();
     void updateVideo(AVFrame *pFrame);

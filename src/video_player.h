@@ -56,6 +56,7 @@ public:
 
     bool v_pause;
     bool v_play;
+    bool v_quit;
     // ------ old element --------
     bool v_isSeek;
     bool v_isFileChange;
@@ -69,17 +70,19 @@ public:
 
 
 private:
+    QString v_file_path; // 源文件路径
 
     // player control
     bool v_read_finished;
-    bool v_quit;
     bool v_video_thread_finished;
     bool v_audio_thread_finished;
 
     double audio_clock;
     double video_clock;
 
-    QString v_file_path;
+    uint64_t v_start_play_time;
+    uint64_t v_start_pause_time;
+
     AVStream *mVideoStream; //视频流
     AVStream *mAudioStream; //音频流
     // 视频
