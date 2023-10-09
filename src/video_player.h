@@ -72,6 +72,15 @@ public:
 private:
     QString v_file_path; // 源文件路径
 
+    int video_stream;
+    int audio_stream;
+
+    // video_seek
+    AVRational v_video_timebase;
+    int seek_flag_audio;
+    int seek_flag_video;
+    double seek_time;
+
     // player control
     bool v_read_finished;
     bool v_video_thread_finished;
