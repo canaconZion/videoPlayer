@@ -36,6 +36,7 @@ bool VideoPlayer::start_play(QString file_path)
     v_quit = false;
     v_pause = false;
     v_read_finished = false;
+    v_isSeek = false;
     v_file_path = file_path;
     std::thread([&](VideoPlayer *pointer)
     {
@@ -67,8 +68,6 @@ void VideoPlayer::read_video_file()
 
     audio_clock = 0;
     video_clock = 0;
-
-    int video_stream,audio_stream;
 
     pFormatCtx = avformat_alloc_context();
 
@@ -103,6 +102,8 @@ void VideoPlayer::read_video_file()
     if(video_stream >=0)
     {
         // get video msg
+        v_video_timebase = pFormatCtx->streams[video_stream]->time_base;
+        qDebug() << "TimeBase:" << v_video_timebase.num << "/" << v_video_timebase.den;
         v_bitRate = pFormatCtx->bit_rate/1000;
         v_total_time = pFormatCtx->duration/1000000;
         v_frameRate = av_q2d(pFormatCtx->streams[video_stream]->r_frame_rate);
@@ -228,6 +229,56 @@ void VideoPlayer::read_video_file()
         if(v_quit == true)
         {
             break;
+        }
+        if (v_isSeek)
+        {
+            int stream_index = -1;
+            int64_t seek_target = seek_pos;
+
+            if (video_stream >= 0)
+                stream_index = video_stream;
+            else if (audio_stream >= 0)
+                stream_index = audio_stream;
+
+            AVRational aVRational = {1, AV_TIME_BASE};
+            if (stream_index >= 0)
+            {
+                seek_target = av_rescale_q(seek_target, aVRational, pFormatCtx->streams[stream_index]->time_base);
+            }
+
+            if (av_seek_frame(pFormatCtx, stream_index, seek_target, AVSEEK_FLAG_BACKWARD) < 0)
+            {
+                fprintf(stderr, "%s: error while seeking\n",pFormatCtx->filename);
+            }
+            else
+            {
+                if (audio_stream >= 0)
+                {
+                    AVPacket packet;
+                    av_new_packet(&packet, 10);
+                    strcpy((char*)packet.data,FLUSH_DATA);
+                    clearAudioQuene();
+                    inputAudioQuene(packet);
+                }
+
+                if (video_stream >= 0)
+                {
+                    AVPacket packet;
+                    av_new_packet(&packet, 10);
+                    strcpy((char*)packet.data,FLUSH_DATA);
+                    clearVideoQuene();
+                    inputVideoQuene(packet);
+                    video_clock = 0;
+                }
+
+                v_start_play_time = av_gettime() - seek_pos;
+                v_start_pause_time = av_gettime();
+            }
+            v_isSeek = false;
+            seek_time = seek_pos / 1000000.0;
+            seek_flag_audio = 1;
+            seek_flag_video = 1;
+
         }
         if (mAudioPacktList.size() > MAX_AUDIO_SIZE || mVideoPacktList.size() > MAX_VIDEO_SIZE)
         {
@@ -361,7 +412,7 @@ void VideoPlayer::decode_video_thread()
             }
             else
             {
-                qDebug() << "empty list";
+                // qDebug() << "empty list";
                 v_mSleep(1);
                 continue;
             }
@@ -401,7 +452,20 @@ void VideoPlayer::decode_video_thread()
             video_pts *= av_q2d(mVideoStream->time_base);
             video_clock = video_pts;
             // TODO:发生跳转
-            qDebug() << "-----send one frame-------" << video_pts;
+            // if(v_isSeek)
+            // {
+                // qDebug() << "Video do seek";
+                //                if (av_seek_frame(pFormatCtx, video_stream, seek_pos, AVSEEK_FLAG_BACKWARD) < 0)
+                //                {
+                //                    qCritical() << "Error while seeking";
+                //                }
+                //                if (av_seek_frame(pFormatCtx, audio_stream, seek_pos, AVSEEK_FLAG_BACKWARD) < 0)
+                //                {
+                //                    qCritical() << "Error while seeking";
+                //                }
+                // v_isSeek = false;
+            // }
+            // qDebug() << "-----send one frame-------" << video_pts;
             while(1)
             {
                 if (v_quit)
@@ -428,7 +492,7 @@ void VideoPlayer::decode_video_thread()
                 if (v_pause) break;
 
                 int delayTime = (video_pts - audio_pts) * 1000;
-                qDebug() << "delayTime ------" << delayTime;
+                // qDebug() << "delayTime ------" << delayTime;
 
                 delayTime = delayTime > 5 ? 5:delayTime;
                 v_mSleep(delayTime);
